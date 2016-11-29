@@ -159,9 +159,40 @@ func TestNewTLSVersionedClient(t *testing.T) {
 	}
 }
 
+func TestNewTLSVersionedClientNoClientCert(t *testing.T) {
+	certPath := "testing/data/cert_doesnotexist.pem"
+	keyPath := "testing/data/key_doesnotexist.pem"
+	caPath := "testing/data/ca.pem"
+	endpoint := "https://localhost:4243"
+	client, err := NewVersionedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.endpoint != endpoint {
+		t.Errorf("Expected endpoint %s. Got %s.", endpoint, client.endpoint)
+	}
+	if reqVersion := client.requestedAPIVersion.String(); reqVersion != "1.14" {
+		t.Errorf("Wrong requestAPIVersion. Want %q. Got %q.", "1.14", reqVersion)
+	}
+	if client.SkipServerVersionCheck {
+		t.Error("Expected SkipServerVersionCheck to be false, got true")
+	}
+}
+
 func TestNewTLSVersionedClientInvalidCA(t *testing.T) {
 	certPath := "testing/data/cert.pem"
 	keyPath := "testing/data/key.pem"
+	caPath := "testing/data/key.pem"
+	endpoint := "https://localhost:4243"
+	_, err := NewVersionedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
+	if err == nil {
+		t.Errorf("Expected invalid ca at %s", caPath)
+	}
+}
+
+func TestNewTLSVersionedClientInvalidCANoClientCert(t *testing.T) {
+	certPath := "testing/data/cert_doesnotexist.pem"
+	keyPath := "testing/data/key_doesnotexist.pem"
 	caPath := "testing/data/key.pem"
 	endpoint := "https://localhost:4243"
 	_, err := NewVersionedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
@@ -658,12 +689,11 @@ func TestClientStreamJSONDecodeWithTerminal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "latest: Pulling from tsuru/static\n" +
-		"\x1b[0B\n" +
-		"\x1b[0A\x1b[2K\ra6aa3b66376f: Already exists \r\x1b[0B\n" +
-		"\x1b[0A\x1b[2K\r106572778bf7: Pulling fs layer \r\x1b[0B\n" +
-		"\x1b[0A\x1b[2K\rbac681833e51: Pulling fs layer \r\x1b[0B\n" +
-		"\x1b[0A\x1b[2K\r7302e23ef08a: Pulling fs layer \r\x1b[0B\x1b[2A\x1b[2K\rbac681833e51: Downloading [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Verifying Checksum \r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Download complete \r\x1b[2B\x1b[3A\x1b[2K\r106572778bf7: Downloading [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Verifying Checksum \r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Download complete \r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Extracting [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Extracting [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [>                                                  ]   233 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [=>                                                 ] 462.4 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [====================>                              ] 8.491 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [=================================================> ] 20.88 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Verifying Checksum \r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Download complete \r\x1b[1B\x1b[3A\x1b[2K\r106572778bf7: Pull complete \r\x1b[3B\x1b[2A\x1b[2K\rbac681833e51: Extracting [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Extracting [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Pull complete \r\x1b[2B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [>                                                  ] 229.4 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [=>                                                 ] 458.8 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [==========================>                        ] 11.24 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [==================================================>] 21.06 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Pull complete \r\x1b[1BDigest: sha256:b754472891aa7e33fc0214e3efa988174f2c2289285fcae868b7ec8b6675fc77\n" +
+	expected := "latest: Pulling from tsuru/static\n\n" +
+		"\x1b[1A\x1b[2K\ra6aa3b66376f: Already exists \r\x1b[1B\n" +
+		"\x1b[1A\x1b[2K\r106572778bf7: Pulling fs layer \r\x1b[1B\n" +
+		"\x1b[1A\x1b[2K\rbac681833e51: Pulling fs layer \r\x1b[1B\n" +
+		"\x1b[1A\x1b[2K\r7302e23ef08a: Pulling fs layer \r\x1b[1B\x1b[2A\x1b[2K\rbac681833e51: Downloading [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Verifying Checksum \r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Download complete \r\x1b[2B\x1b[3A\x1b[2K\r106572778bf7: Downloading [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Verifying Checksum \r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Download complete \r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Extracting [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[3A\x1b[2K\r106572778bf7: Extracting [==================================================>] 1.854 kB/1.854 kB\r\x1b[3B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [>                                                  ]   233 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [=>                                                 ] 462.4 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [====================>                              ] 8.491 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Downloading [=================================================> ] 20.88 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Verifying Checksum \r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Download complete \r\x1b[1B\x1b[3A\x1b[2K\r106572778bf7: Pull complete \r\x1b[3B\x1b[2A\x1b[2K\rbac681833e51: Extracting [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Extracting [==================================================>]    621 B/621 B\r\x1b[2B\x1b[2A\x1b[2K\rbac681833e51: Pull complete \r\x1b[2B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [>                                                  ] 229.4 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [=>                                                 ] 458.8 kB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [==========================>                        ] 11.24 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Extracting [==================================================>] 21.06 MB/21.06 MB\r\x1b[1B\x1b[1A\x1b[2K\r7302e23ef08a: Pull complete \r\x1b[1BDigest: sha256:b754472891aa7e33fc0214e3efa988174f2c2289285fcae868b7ec8b6675fc77\n" +
 		"Status: Downloaded newer image for 192.168.50.4:5000/tsuru/static\n"
 	result := w.String()
 	if result != expected {
